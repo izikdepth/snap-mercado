@@ -1,0 +1,28 @@
+refresh_rate: 30 seconds
+
+appenders:
+  stdout:
+    kind: console
+  deposit:
+    kind: file
+    path: "log/deposits.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+  withdrawal:
+    kind: file
+    path: "log/withdrawals.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+
+root:
+  level: warn
+  appenders:
+    - stdout
+
+loggers:
+  snap_mercado::chain:
+    level: info
+    appenders:
+      - deposit
+      - withdrawal
+    additive: false

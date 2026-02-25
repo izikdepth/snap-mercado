@@ -1,0 +1,24 @@
+[package]
+name = "snap-mercado"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+rustfmt = "0.10.0"
+log4rs = "1.0"
+log = "0.4.29"
+snap-coin = "=13.3.0"
+dotenvy = "0.15.7"
+snap-coin-pay = "1.0.0"
+derive_more = "0.99"
+serde_json = "1.0.149"
+serde = { version = "1.0", features = ["derive"] }
+sqlite = "0.37"
+futures = "0.3"
+axum = { version = "0.8.8", features = ["macros", "tokio"] }
+tower-http = { version = "0.6.8", features = ["cors"] }
+dotenv = "0.15"
+chrono = "0.4.44"
+jsonwebtoken = "10.3.0"
+lettre = "0.11.19"
