@@ -29,6 +29,11 @@ pub enum AuthError {
     TokenCreation {
         message: String,
     },
+
+    #[display(fmt = "Invalid token error: {}", message)]
+    InvalidToken {
+        message: String,
+    },
 }
 
 impl IntoResponse for AuthError {
@@ -43,6 +48,7 @@ impl IntoResponse for AuthError {
             }
             AuthError::InvalidData { .. } => StatusCode::BAD_REQUEST,
             AuthError::TokenCreation { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::InvalidToken { .. } => StatusCode::UNAUTHORIZED,
         };
 
         (status, self.to_string()).into_response()

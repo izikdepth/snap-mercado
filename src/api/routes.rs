@@ -1,5 +1,5 @@
 use crate::api::signup;
-use axum::{Router, routing::post};
+use axum::{Router, routing::get, routing::post};
 use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Clone)]
@@ -16,6 +16,7 @@ pub fn routes(state: AppState) -> Router<AppState> {
 
     Router::new()
         .route("/signup", post(signup::signup_request))
+        .route("/confirm", get(signup::confirm_email))
         .layer(cors)
         .with_state(state)
 }

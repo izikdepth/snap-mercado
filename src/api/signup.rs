@@ -1,17 +1,30 @@
 use crate::api::{AuthError, routes::AppState};
-use axum::{Json, extract::State};
+use axum::{Json, extract::Query, extract::State};
 use dotenv::dotenv;
-use jsonwebtoken::{EncodingKey, Header, encode};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use lettre::message::{Message, header};
 use serde::{Deserialize, Serialize};
 use sqlite::{Connection, OpenFlags};
 use std::env;
+use uuid::Uuid;
 
 /// This struct holds the vars expected in a signup request
 #[derive(Serialize, Deserialize)]
 pub struct RegistrationRequest {
     pub username: String,
     pub email: String,
+}
+
+#[derive(Deserialize)]
+pub struct UrlExtraction {
+    pub token: String,
+}
+
+#[derive(Deserialize)]
+pub struct ConfirmationClaim {
+    pub email: String,
+    pub username: String,
+    pub exp: i16,
 }
 
 /// takes appdata, registration request (email, username)  and returns an ok response or authentication error.
@@ -122,6 +135,73 @@ async fn send_confirmation_email(r: &RegistrationRequest) -> std::result::Result
     // TODO: implement mail sending logic
     // log to prevent warning
     println!("email : {:#?}", email);
+
+    Ok(())
+}
+
+// this function extracts the token from the url params,
+// validates the token, create a user id and save it to the db with the username and email.
+pub async fn confirm_email(
+    Query(params): Query<UrlExtraction>,
+    State(state): State<AppState>,
+) -> std::result::Result<(), AuthError> {
+    dotenv().ok();
+
+    // use the jwt secret key used to encode the token to decode it for confirmation
+    let secret_key = env::var("JWT_SECRET").expect("JWT_SECRET is not set");
+    let decoding_key = DecodingKey::from_secret(secret_key.as_ref());
+
+    // extract the confirmation token from the confirmation url
+    let token_param = params.token;
+
+    // validate token expiry time
+    let mut validation = Validation::default();
+    validation.validate_exp = true;
+    validation.leeway = 60; //allow 60 seconds clock skew
+
+    // decode token
+    let decoded =
+        decode::<ConfirmationClaim>(&token_param, &decoding_key, &&validation).map_err(|_| {
+            AuthError::InvalidToken {
+                message: "failed to decode token".to_string(),
+            }
+        })?;
+
+    let claims = decoded.claims;
+
+    let username = claims.username;
+    let email = claims.email;
+
+    if username.is_empty() {
+        return Err(AuthError::InvalidToken {
+            message: "Username is missing".to_string(),
+        });
+    }
+
+    if email.is_empty() {
+        return Err(AuthError::InvalidToken {
+            message: "Email is missing".to_string(),
+        });
+    }
+
+    // open a connection to the sqlite3 database
+    let db_path = &state.database_name;
+
+    let conn =
+        Connection::open_with_flags(db_path, OpenFlags::new().with_create().with_read_write())?;
+
+    // create a user id for the user
+    let user_id = Uuid::new_v4();
+
+    // insert the user into the db
+    {
+        let mut stmt = conn.prepare("INSERT INTO users (id, username, email) VALUES (?, ?, ?)")?;
+        stmt.bind((1, user_id.to_string().as_str()))?;
+        stmt.bind((2, username.as_str()))?;
+        stmt.bind((3, email.as_str()))?;
+
+        stmt.next()?;
+    }
 
     Ok(())
 }
