@@ -17,9 +17,14 @@ serde_json = "1.0.149"
 serde = { version = "1.0", features = ["derive"] }
 sqlite = "0.37"
 futures = "0.3"
-axum = { version = "0.8.8", features = ["macros", "tokio"] }
+axum = { version = "0.7.9", features = ["macros", "tokio"] }
 tower-http = { version = "0.6.8", features = ["cors"] }
 dotenv = "0.15"
 chrono = "0.4.44"
 jsonwebtoken = "10.3.0"
 lettre = "0.11.19"
+rand = "0.8"
+argon2 = { version = "0.5", features = ["password-hash"] }
+inquire = "0.9.4"
+axum_session = "0.17"
+axum-extra = { version = "0.9", features = ["cookie"] }

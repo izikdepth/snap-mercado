@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use derive_more::Display;
+use inquire::InquireError;
 
 #[derive(Clone, Debug, Display)]
 pub enum AuthError {
@@ -34,6 +35,26 @@ pub enum AuthError {
     InvalidToken {
         message: String,
     },
+
+    #[display(fmt = "Hash Failed error: {}", message)]
+    HashFailed {
+        message: String,
+    },
+
+    #[display(fmt = "User not found error: {}", message)]
+    UserNotFound {
+        message: String,
+    },
+
+    #[display(fmt = "Invalid input error: {}", message)]
+    InvalidInput {
+        message: String,
+    },
+
+    #[display(fmt = "Session error: {}", message)]
+    SessionError {
+        message: String,
+    },
 }
 
 impl IntoResponse for AuthError {
@@ -49,6 +70,10 @@ impl IntoResponse for AuthError {
             AuthError::InvalidData { .. } => StatusCode::BAD_REQUEST,
             AuthError::TokenCreation { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AuthError::InvalidToken { .. } => StatusCode::UNAUTHORIZED,
+            AuthError::HashFailed { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::UserNotFound { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::InvalidInput { .. } => StatusCode::BAD_REQUEST,
+            AuthError::SessionError { .. } => StatusCode::BAD_REQUEST,
         };
 
         (status, self.to_string()).into_response()
@@ -67,6 +92,14 @@ impl From<jsonwebtoken::errors::Error> for AuthError {
     fn from(value: jsonwebtoken::errors::Error) -> Self {
         AuthError::TokenCreation {
             message: format!("JWT Token error: {}", value),
+        }
+    }
+}
+
+impl From<InquireError> for AuthError {
+    fn from(err: InquireError) -> Self {
+        AuthError::InvalidData {
+            message: err.to_string(),
         }
     }
 }

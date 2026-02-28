@@ -1,5 +1,9 @@
 use crate::api::{AuthError, routes::AppState};
+use crate::crypto::password::hash_password;
+use axum::response::IntoResponse;
+use axum::response::Redirect;
 use axum::{Json, extract::Query, extract::State};
+use axum_extra::extract::cookie::{Cookie, CookieJar};
 use dotenv::dotenv;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use lettre::message::{Message, header};
@@ -24,7 +28,7 @@ pub struct UrlExtraction {
 pub struct ConfirmationClaim {
     pub email: String,
     pub username: String,
-    pub exp: i16,
+    pub exp: i64,
 }
 
 /// takes appdata, registration request (email, username)  and returns an ok response or authentication error.
@@ -144,7 +148,7 @@ async fn send_confirmation_email(r: &RegistrationRequest) -> std::result::Result
 pub async fn confirm_email(
     Query(params): Query<UrlExtraction>,
     State(state): State<AppState>,
-) -> std::result::Result<(), AuthError> {
+) -> std::result::Result<(CookieJar, Redirect), AuthError> {
     dotenv().ok();
 
     // use the jwt secret key used to encode the token to decode it for confirmation
@@ -203,5 +207,50 @@ pub async fn confirm_email(
         stmt.next()?;
     }
 
-    Ok(())
+    // set cookie after successful confirmation
+    let mut jar = CookieJar::new();
+    jar = jar.add(Cookie::new("user_id", user_id.to_string()));
+    Ok((jar, Redirect::to("/create-password")))
+}
+
+// this function allows the user to create a password, hashes it and stores it in a db
+#[axum::debug_handler]
+pub async fn create_password(
+    jar: CookieJar,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AuthError> {
+    use inquire::Password;
+
+    let user_id = jar
+        .get("user_id")
+        .ok_or(AuthError::SessionError {
+            message: "user_id not found".to_string(),
+        })?
+        .value()
+        .to_string();
+
+    // prompt for password with confirmation
+    let pwd = Password::new("Enter your password:")
+        .with_custom_confirmation_message("Confirm your password:")
+        .with_custom_confirmation_error_message("The passwords don't match.")
+        .prompt()?;
+
+    // Open DB connection
+    let db_path = &state.database_name;
+    let conn =
+        Connection::open_with_flags(db_path, OpenFlags::new().with_create().with_read_write())?;
+
+    // Hash and update
+    let hash = hash_password(&pwd).await?;
+
+    let mut stmt = conn.prepare("UPDATE users SET password_hash = ?1 WHERE user_id = ?2")?;
+
+    stmt.bind((1, hash.as_str()))?;
+    stmt.bind((2, user_id.as_str()))?;
+
+    stmt.next()?;
+
+    // remove cookie after use
+    let jar = jar.remove(Cookie::from("user_id"));
+    Ok((jar, "Password updated"))
 }
